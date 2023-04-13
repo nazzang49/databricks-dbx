@@ -1,0 +1,16 @@
+build:
+  python: "pip"
+
+environments:
+  default:
+    workflows:
+      - name: "synthetic"
+        tasks:
+          - task_key: "synthetic"
+            spark_python_task:
+              python_file: "file://ptbwa_dbx/synthetic.py"
+#      - name: "notebook_task"
+#        tasks:
+#          - task_key: "notebook_task"
+#            notebook_task:
+#              notebook_path: "/Repos/Staging/ptbwa_dbx/notebooks/notebook_test"
