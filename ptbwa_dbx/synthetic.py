@@ -22,6 +22,8 @@ class PropfitCommonType(Enum):
     DMP = "dmp"
     GA4 = "ga4"
     JOIN = "join"
+    DATABRICKS = "databricks"
+    SDV = "sdv"
 
 spark = SparkSession.builder.appName("SYNTHETIC_MODELING").getOrCreate()
 
@@ -73,6 +75,11 @@ class MyValidator:
         ],
     }
 
+    _CANDIDATES_DATASET_TYPES = [
+        "databricks",
+        "sdv"
+    ]
+
     def __init__(self) -> None:
         pass
 
@@ -92,6 +99,11 @@ class MyValidator:
 
         if after not in MyValidator._CANDIDATES_CASES[before]:
             raise ValueError(f"[NOT_FOUND_{after.upper()}]AFTER_CASE")
+
+    @staticmethod
+    def is_valid_dataset_type(dataset_type: str):
+        if dataset_type not in MyValidator._CANDIDATES_DATASET_TYPES:
+            raise ValueError(f"[NOT_FOUND_{dataset_type.upper()}]INVALID")
 
 class MyUtils:
     """
@@ -142,17 +154,36 @@ class MyDataset:
             if isinstance(v, dataframe.DataFrame):
                 v.createOrReplaceTempView(f"{k}_view") # e.g. df_dmp_view
 
-    def join_views(self):
+    def create_dataset(self):
         """
-        A method for joining views based on each sql files of advertisers
+        A method for creating train dataset by joining dataframes
+        dataframes:
+            propfit
+            dmp
+            ga4
         """
-        query = f"""
-            select *
-            from df_propfit_view a
-        """
+        try:
+            query = MyQuery.get_query(PropfitCommonType.JOIN.value, "migun")
+            self.df = spark.sql(query)
+        except Exception as e:
+            print(f"[FAIL-JOIN-PROCESS]")
+            raise e
 
-    def create_synthetic_dataset(cls, dataset_type: str):
+    def _create_databricks_synthetics(self):
         pass
+
+    def _create_sdv_synthetics(self):
+        pass
+
+    def create_synthetics(self, dataset_type: str):
+        MyValidator.is_valid_dataset_type(dataset_type)
+
+        getattr(self, f"_create_{dataset_type}_synthetics")()
+        
+
+
+
+
 
 class MyVisualizer:
     """
@@ -212,22 +243,22 @@ class MyEvaluator:
 
 
 #####################################################
-############ CREATE DATASET AND TRAINING ############
+################### CREATE DATASET ##################
 #####################################################
 
-query = MyQuery.get_query("dmp")
+query = MyQuery.get_query(PropfitCommonType.DMP.value)
 df_dmp = spark.sql(query)
 df_dmp = MyUtils.convert_case(df_dmp, "camel", "snake")
 
 print(df_dmp.printSchema())
 
-query = MyQuery.get_query("ga4")
+query = MyQuery.get_query(PropfitCommonType.GA4.value)
 df_ga4 = spark.sql(query)
 df_ga4 = MyUtils.convert_case(df_ga4, "camel", "snake")
 
 print(df_ga4.printSchema())
 
-query = MyQuery.get_query("propfit")
+query = MyQuery.get_query(PropfitCommonType.PROPFIT.value)
 df_propfit = spark.sql(query)
 df_propfit = MyUtils.convert_case(df_propfit, "camel", "snake")
 
@@ -241,9 +272,13 @@ dataframes = {
 
 dataset = MyDataset(**dataframes)
 dataset.create_views()
-# spark.sql("select * from df_dmp_view limit 10").show()
-query = MyQuery.get_query("join", "migun")
-spark.sql(query).show(10)
+dataset.create_dataset()
+
+#####################################################
+############### CREATE SYNTHETIC DATA ###############
+#####################################################
+
+dataset.create_synthetics(PropfitCommonType.DATABRICKS.value)
 
 
 
